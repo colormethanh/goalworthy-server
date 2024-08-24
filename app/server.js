@@ -5,6 +5,7 @@ const url = require('url');
 const Router = require('router');
 const bodyParser = require('body-parser');
 const fs = require('fs');
+
 // State holding variables
 let goals = [];
 let user = {};
@@ -14,6 +15,13 @@ let categories = [];
 // Setup router
 let myRouter = Router();
 myRouter.use(bodyParser.json());
+
+// Helper functions
+const filterByQuery = (query, filterSource) => {
+  return filterSource.filter((goal) => {
+    return goal.description.toLowerCase().includes(query.toLowerCase())
+  });
+}
 
 // This function is a bit simpler...
 http.createServer(function (request, response) {
@@ -35,10 +43,33 @@ myRouter.get('/v1/goals', function(request,response) {
   // Get our query params from the query string
   const queryParams = queryString.parse(url.parse(request.url).query)
 
+  let respData = goals;
+
   // TODO: Do something with the query params
+  if (queryParams.query) {
+    const query = queryParams.query;
+    respData  = filterByQuery(query, goals);
+  };
+
+  if (queryParams.sort) {
+    const sortType = queryParams.sort;
+    switch (sortType) {
+      case "upVotes":
+        respData.sort((cur, prev) => {
+         return prev.upVotes - cur.upVotes;
+        })
+        break
+      case "dateCreated":
+        respData.sort((cur, prev) => {
+          return  new Date(prev.dateCreated) - new Date(cur.dateCreated)
+        })
+        break
+    }
+  };
+
 
   // Return all our current goal definitions (for now)
-  return response.end(JSON.stringify(goals));
+  return response.end(JSON.stringify(respData));
 });
 
 // See how i'm not having to build up the raw data in the body... body parser just gives me the whole thing as an object.
