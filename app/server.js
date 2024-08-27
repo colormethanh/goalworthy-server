@@ -40,50 +40,114 @@ http.createServer(function (request, response) {
 
 // Notice how much cleaner these endpoint handlers are...
 myRouter.get('/v1/goals', function(request,response) {
-  // Get our query params from the query string
-  const queryParams = queryString.parse(url.parse(request.url).query)
-
-  let respData = goals;
-
   // TODO: Do something with the query params
-  if (queryParams.query) {
-    const query = queryParams.query;
-    respData  = filterByQuery(query, goals);
-  };
+  try {
+    // Get our query params from the query string
+    const queryParams = queryString.parse(url.parse(request.url).query)
+    let respData = {status: 200, data: goals};
+    if (queryParams.query) {
+      const query = queryParams.query;
+      respData.data = filterByQuery(query, goals);
+    };
+  
+    if (queryParams.sort) {
+      const sortType = queryParams.sort;
+      switch (sortType) {
+        case "upVotes":
+          respData.data.sort((cur, prev) => {
+           return prev.upVotes - cur.upVotes;
+          })
+          break
+        case "dateCreated":
+          respData.data.sort((cur, prev) => {
+            return  new Date(prev.dateCreated) - new Date(cur.dateCreated)
+          })
+          break
+      }
+    };
+    // Return requested goals
+    response.statusCode = 200;
+    return response.end(JSON.stringify(respData));
+  } catch (err) {
+     console.log(err)
+     response.statusCode = 500;
+     return response.end(JSON.stringify({status: 500, data: "Server error"}))
+  }
 
-  if (queryParams.sort) {
-    const sortType = queryParams.sort;
-    switch (sortType) {
-      case "upVotes":
-        respData.sort((cur, prev) => {
-         return prev.upVotes - cur.upVotes;
-        })
-        break
-      case "dateCreated":
-        respData.sort((cur, prev) => {
-          return  new Date(prev.dateCreated) - new Date(cur.dateCreated)
-        })
-        break
-    }
-  };
-
-
-  // Return all our current goal definitions (for now)
-  return response.end(JSON.stringify(respData));
 });
 
-// See how i'm not having to build up the raw data in the body... body parser just gives me the whole thing as an object.
-// See how the router automatically handled the path value and extracted the value for me to use?  How nice!
+// Get user data 
+myRouter.get('/v1/me', function(request, response) {
+  const respData = {}
+  try {
+    if (!user) {
+      return response.end(JSON.stringify({status: 400, data: "User could not be found"}))
+    }
+    respData.data = user;
+    respData.status = 200;
+    return response.end(JSON.stringify(respData));
+  } catch (err) {
+    response.statusCode = 500;
+    return response.end(JSON.stringify({status: 500, data: "Server error"}))
+  }
+})
+
+// Accept a goal
 myRouter.post('/v1/me/goals/:goalId/accept', function(request,response) {
   // Find goal from id in url in list of goals
   let goal = goals.find((goal)=> {
     return goal.id == request.params.goalId
-  })
-  // Add it to our logged in user's accepted goals
-  user.acceptedGoals.push(goal); 
-  // No response needed other than a 200 success
-  return response.end();
+  });
+
+  if (!goal) {
+    response.statusCode = 400;
+    return response.end(JSON.stringify({"status": 400, "data": "Goal could not be found"}));
+  }
+
+  try {
+    // Add goal to our logged in user's accepted goals
+    user.acceptedGoals.push(goal); 
+    
+    // update the goals file
+    // fs.writeFile("users.json", JSON.stringify(users), () => {
+    //   users = JSON.parse(fs.readFileSync("users.json","utf-8"));
+    //   user = users[0];
+    //   // No response needed other than a 200 success
+    //   return response.end(JSON.stringify({"status": 200, "data": "success"}));
+    // });
+    return response.end(JSON.stringify({"status": 200, "data": "success"}));
+  } catch (err) {
+    console.log(err)
+    response.statusCode = 500;
+    return response.end(JSON.stringify({"status": 500, "data": "server error"}))
+  }
 });
+
+// Achieve a goal
+myRouter.post('/v1/me/goals/:goalId/achieve', function(request, response){
+  // get goal from user
+  const goal = user.acceptedGoals.find((goal) => {return goal.id == request.params.goalId}); 
+  if (!goal) {
+    response.statusCode = 400
+    return response.end(JSON.stringify({"status": 400, "data": "Goal could not be found"}));
+  }
+
+  // add goal to achieved goals
+  try {
+    // update the goals file
+    user.achievedGoals.push(goal);
+    // fs.writeFile("users.json", JSON.stringify(users), () => {
+    //   users = JSON.parse(fs.readFileSync("users.json","utf-8"));
+    //   user = users[0];   
+    //   return response.end(JSON.stringify({"status": 200, "data": "success"}));
+    // });
+    return response.end(JSON.stringify({"status": 200, "data": "success"}));
+  } catch (err) {
+    console.log(err)
+    response.statusCode = 500;
+    return response.end(JSON.stringify({"status": 500, "data": "server error"}))
+  }
+})
 
 myRouter.post('/v1/me/goals/:goalId/challenge/:userId', function(request,response) {
   // Find goal from id in url in list of goals
@@ -104,3 +168,4 @@ myRouter.post('/v1/me/goals/:goalId/challenge/:userId', function(request,respons
   // No response needed other than a 200 success
   return response.end();
 });
+
