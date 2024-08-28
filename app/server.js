@@ -39,7 +39,7 @@ http.createServer(function (request, response) {
 });
 
 // Notice how much cleaner these endpoint handlers are...
-myRouter.get('/v1/goals', function(request,response) {
+myRouter.get('/v1/goals', function (request,response) {
   // TODO: Do something with the query params
   try {
     // Get our query params from the query string
@@ -60,7 +60,7 @@ myRouter.get('/v1/goals', function(request,response) {
           break
         case "dateCreated":
           respData.data.sort((cur, prev) => {
-            return  new Date(prev.dateCreated) - new Date(cur.dateCreated)
+            return  new Date(prev.dateCreated) - new Date(cur.dateCreated);
           })
           break
       }
@@ -76,8 +76,35 @@ myRouter.get('/v1/goals', function(request,response) {
 
 });
 
+// Get categories
+myRouter.get('/v1/categories', function (request, response) {
+  try {
+    return response.end(JSON.stringify({"status": 200, "data" : categories}));
+  } catch (err) {
+    response.statusCode = 500;
+    return response.end(JSON.stringify({"status": 500, "data": "Server error"}));
+  }
+})
+
+// Get goals in specific category
+myRouter.get('/v1/categories/:id/goals', function (request, response) {
+  
+  try {
+    let filteredGoals = goals.filter((goal) => {
+      console.log(request.queryParams);
+      return goal.categoryId == request.params.id;
+    });
+
+    return response.end(JSON.stringify({"status": 200, data: filteredGoals}));
+  } catch(err) {
+    console.log(err)
+    response.statusCode = 500;
+    return response.end(JSON.stringify({"status": 500, data: err}))
+  }
+})
+
 // Get user data 
-myRouter.get('/v1/me', function(request, response) {
+myRouter.get('/v1/me', function (request, response) {
   const respData = {}
   try {
     if (!user) {
@@ -93,7 +120,7 @@ myRouter.get('/v1/me', function(request, response) {
 })
 
 // Accept a goal
-myRouter.post('/v1/me/goals/:goalId/accept', function(request,response) {
+myRouter.post('/v1/me/goals/:goalId/accept', function (request,response) {
   // Find goal from id in url in list of goals
   let goal = goals.find((goal)=> {
     return goal.id == request.params.goalId
@@ -124,7 +151,7 @@ myRouter.post('/v1/me/goals/:goalId/accept', function(request,response) {
 });
 
 // Achieve a goal
-myRouter.post('/v1/me/goals/:goalId/achieve', function(request, response){
+myRouter.post('/v1/me/goals/:goalId/achieve', function (request, response){
   // get goal from user
   const goal = user.acceptedGoals.find((goal) => {return goal.id == request.params.goalId}); 
   if (!goal) {
@@ -149,7 +176,9 @@ myRouter.post('/v1/me/goals/:goalId/achieve', function(request, response){
   }
 })
 
-myRouter.post('/v1/me/goals/:goalId/challenge/:userId', function(request,response) {
+// Challenge another user
+myRouter.post('/v1/me/goals/:goalId/challenge/:userId', function (request,response) {
+
   // Find goal from id in url in list of goals
   let goal = goals.find((goal)=> {
     return goal.id == request.params.goalId
@@ -160,12 +189,40 @@ myRouter.post('/v1/me/goals/:goalId/challenge/:userId', function(request,respons
   })
   // Make sure the data being changed is valid
   if (!goal) {
-    response.statusCode = 400
-    return response.end("No goal with that ID found.")
+    response.statusCode = 400;
+    return response.end("No goal with that ID found.");
   }
   // Add the goal to the challenged user
   challengedUser.challengedGoals.push(goal); 
   // No response needed other than a 200 success
   return response.end();
 });
+
+// Gift a goal 
+myRouter.post('/v1/me/goals/:id/gift/:userId', function (request, response) {
+  let goal = goals.find((goal) => {
+     return goal.id == request.params.id;
+  });
+
+  let user = users.find((user) => {
+    return user.id == request.params.userId;
+  });
+
+  if (!user || !goal) {
+    response.statusCode = 404;
+    return response.end(JSON.stringify({"status": 404, "data": "could not find user or goal"}));
+  };
+
+  try {
+    user.giftedGoals.push(goal);
+    response.statusCode = 500;
+    return response.end(JSON.stringify({"status": 500, "data":"success"}));
+  } catch (err) {
+    response.statusCode = 500;
+    return request.end(JSON.stringify({'status': 500, "data": "server error"}));
+  }
+
+})
+
+
 
